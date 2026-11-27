@@ -48,7 +48,7 @@ pub async fn handle(server: &Server, msg: Value) -> Option<Value> {
         "ping" => ok(id, json!({})),
         "tools/list" => ok(
             id,
-            json!({ "tools": tools::list_tools(&server.accounts, &server.prefix) }),
+            json!({ "tools": tools::list_tools(&server.accounts.get(), &server.prefix) }),
         ),
         "tools/call" => {
             let Some(name) = params["name"].as_str() else {

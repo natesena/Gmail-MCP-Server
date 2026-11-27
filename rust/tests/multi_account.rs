@@ -64,7 +64,7 @@ async fn fixture(work_expiry: i64, default: Option<&str>) -> Fixture {
         token_url: format!("{}/token", mock.uri()),
     };
     let server = Server {
-        accounts: Accounts::load(&cfg, &endpoints),
+        accounts: Accounts::load(&cfg, &endpoints).into(),
         prefix: String::new(),
     };
     Fixture {

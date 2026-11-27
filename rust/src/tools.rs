@@ -18,6 +18,13 @@ use std::sync::LazyLock;
 
 pub const LIST_ACCOUNTS: &str = "list_accounts";
 
+/// Read tools that accept `account: "all"` (multi-account mode).
+pub const ALL_ACCOUNT_TOOLS: &[&str] = &[
+    "search_emails",
+    "list_inbox_threads",
+    "get_inbox_with_threads",
+];
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolDef {
@@ -81,17 +88,22 @@ pub fn accounts_for_tool(accounts: &Accounts, tool: &ToolDef) -> Vec<String> {
         .collect()
 }
 
-fn account_property(accounts: &Accounts, allowed: &[String]) -> Value {
+fn account_property(accounts: &Accounts, allowed: &[String], tool: &str) -> Value {
     let mut desc = format!("Gmail account to use. One of: {}.", allowed.join(", "));
+    let mut values: Vec<String> = allowed.to_vec();
+    if allowed.len() > 1 && ALL_ACCOUNT_TOOLS.contains(&tool) {
+        values.push("all".into());
+        desc.push_str(" Use \"all\" to run on every account and get results labelled by account.");
+    }
     if let Some(d) = &accounts.default {
         if allowed.contains(d) {
             desc.push_str(&format!(" Defaults to \"{d}\"."));
         }
     }
-    json!({ "type": "string", "enum": allowed, "description": desc })
+    json!({ "type": "string", "enum": values, "description": desc })
 }
 
-fn with_account(schema: &Value, accounts: &Accounts, allowed: &[String]) -> Value {
+fn with_account(schema: &Value, accounts: &Accounts, allowed: &[String], tool: &str) -> Value {
     let mut s = schema.clone();
     let obj = s.as_object_mut().expect("schema object");
     let props = obj
@@ -99,7 +111,7 @@ fn with_account(schema: &Value, accounts: &Accounts, allowed: &[String]) -> Valu
         .or_insert_with(|| json!({}))
         .as_object_mut()
         .expect("properties object");
-    props.insert("account".into(), account_property(accounts, allowed));
+    props.insert("account".into(), account_property(accounts, allowed, tool));
     let default_ok = accounts
         .default
         .as_ref()
@@ -153,7 +165,10 @@ pub fn list_tools(accounts: &Accounts, prefix: &str) -> Vec<Value> {
                     allowed.join(", ")
                 ));
             }
-            (d, with_account(&tool.input_schema, accounts, &allowed))
+            (
+                d,
+                with_account(&tool.input_schema, accounts, &allowed, &tool.name),
+            )
         } else {
             (tool.description.clone(), tool.input_schema.clone())
         };

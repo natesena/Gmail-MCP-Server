@@ -101,7 +101,13 @@ fn multi_account_surface_only_adds_account_and_list_accounts() {
             .unwrap()
             .remove("account")
             .expect("account prop");
-        assert_eq!(acct["enum"], serde_json::json!(["personal", "work"]));
+        let fan_out = gmail_mcp::tools::ALL_ACCOUNT_TOOLS.contains(&t["name"].as_str().unwrap());
+        let expected = if fan_out {
+            serde_json::json!(["personal", "work", "all"])
+        } else {
+            serde_json::json!(["personal", "work"])
+        };
+        assert_eq!(acct["enum"], expected, "{}", t["name"]);
         // no default => account is required, appended last
         let req = rs["required"].as_array_mut().unwrap();
         assert_eq!(req.pop().unwrap(), "account", "{}", t["name"]);

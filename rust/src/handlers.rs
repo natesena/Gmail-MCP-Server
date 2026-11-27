@@ -2,7 +2,7 @@
 //! `index.ts`). Output text matches the Node server so existing prompts and
 //! habits keep working; every handler runs against one resolved account.
 
-use crate::accounts::{Account, Accounts};
+use crate::accounts::{Account, Accounts, AccountsHandle, ALL_ACCOUNTS};
 use crate::gmail::{api_status, q, seg, Gmail, Query};
 use crate::message::{self as msg, EmailContent};
 use crate::mime::{self, EmailArgs};
@@ -17,7 +17,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 pub struct Server {
-    pub accounts: Accounts,
+    pub accounts: AccountsHandle,
     pub prefix: String,
 }
 
@@ -52,9 +52,10 @@ fn check_enum(field: &str, value: &str, allowed: &[&str]) -> Result<()> {
 impl Server {
     /// tools/call entry point. Never fails: errors become tool results.
     pub async fn call_tool(&self, raw_name: &str, args: Value) -> Value {
+        let accounts = self.accounts.get();
         let name = tools::strip_prefix(raw_name, &self.prefix);
         if name == LIST_ACCOUNTS {
-            return match self.list_accounts().await {
+            return match list_accounts(&accounts).await {
                 Ok(v) => v,
                 Err(e) => error_result(format!("Error: {e:#}")),
             };
@@ -67,8 +68,18 @@ impl Server {
         let Some(def) = tools::get_tool(name) else {
             return not_available("");
         };
-        let requested = args.get("account").and_then(Value::as_str);
-        let account = match self.accounts.resolve(requested) {
+        let requested = args
+            .get("account")
+            .and_then(Value::as_str)
+            .map(String::from);
+        let mut args = args;
+        if let Some(obj) = args.as_object_mut() {
+            obj.remove("account");
+        }
+        if requested.as_deref() == Some(ALL_ACCOUNTS) {
+            return all_accounts(&accounts, def, name, &args).await;
+        }
+        let account = match accounts.resolve(requested.as_deref()) {
             Ok(a) => a,
             Err(e) => return error_result(format!("Error: {e:#}")),
         };
@@ -80,58 +91,109 @@ impl Server {
         }
         // Guards direct calls that bypass tools/list; scopes are per account.
         if !has_scope(&account.scopes, &def.scopes) {
-            let extra = if self.accounts.is_multi() {
+            let extra = if accounts.is_multi() {
                 format!(" for account \"{}\"", account.name)
             } else {
                 String::new()
             };
             return not_available(&extra);
         }
-        let mut args = args;
-        if let Some(obj) = args.as_object_mut() {
-            obj.remove("account");
-        }
         match dispatch(name, &account, &args).await {
             Ok(v) => v,
             Err(e) => error_result(format!("Error: {e:#}")),
         }
     }
+}
 
-    async fn list_accounts(&self) -> Result<Value> {
-        let entries = join_all(self.accounts.list.iter().map(|a| async move {
-            let mut e = Map::new();
-            e.insert("account".into(), json!(a.name));
-            e.insert(
-                "default".into(),
-                json!(self.accounts.default.as_deref() == Some(a.name.as_str())),
-            );
-            match &a.load_error {
-                Some(err) => {
-                    e.insert("status".into(), json!("unavailable"));
-                    e.insert("error".into(), json!(err));
-                }
-                None => {
-                    match a.email().await {
-                        Ok(email) => {
-                            e.insert("email".into(), json!(email));
-                            e.insert("status".into(), json!("ok"));
-                        }
-                        Err(err) => {
-                            e.insert("status".into(), json!("error"));
-                            e.insert("error".into(), json!(format!("{err:#}")));
-                        }
-                    }
-                    e.insert("scopes".into(), json!(a.scopes));
+/// `account: "all"`: run a read tool on every usable account concurrently and
+/// return one JSON document with a result (or error) per account.
+async fn all_accounts(
+    accounts: &Accounts,
+    def: &tools::ToolDef,
+    name: &str,
+    args: &Value,
+) -> Value {
+    if !tools::ALL_ACCOUNT_TOOLS.contains(&name) {
+        return error_result(format!(
+            "Error: account \"all\" is only supported by: {}",
+            tools::ALL_ACCOUNT_TOOLS.join(", ")
+        ));
+    }
+    let targets: Vec<Arc<Account>> = accounts
+        .list
+        .iter()
+        .filter(|a| a.load_error.is_none() && has_scope(&a.scopes, &def.scopes))
+        .cloned()
+        .collect();
+    if targets.is_empty() {
+        return error_result("Error: no account can run this tool");
+    }
+    let results = join_all(targets.iter().map(|a| async move {
+        let mut e = Map::new();
+        e.insert("account".into(), json!(a.name));
+        if let Ok(email) = a.email().await {
+            e.insert("email".into(), json!(email));
+        }
+        match dispatch(name, a, args).await {
+            Ok(v) => {
+                let text = v["content"][0]["text"].as_str().unwrap_or("").to_string();
+                if v["isError"] == true {
+                    e.insert("error".into(), json!(text));
+                } else {
+                    let parsed = serde_json::from_str::<Value>(&text).unwrap_or(json!(text));
+                    e.insert("result".into(), parsed);
                 }
             }
-            Value::Object(e)
-        }))
-        .await;
-        Ok(text_result(serde_json::to_string_pretty(&json!({
-            "accounts": entries,
-            "defaultAccount": self.accounts.default,
-        }))?))
+            Err(err) => {
+                e.insert("error".into(), json!(format!("{err:#}")));
+            }
+        }
+        Value::Object(e)
+    }))
+    .await;
+    let any_ok = results.iter().any(|r| r.get("result").is_some());
+    let body = serde_json::to_string_pretty(&json!({ "accounts": results })).unwrap_or_default();
+    if any_ok {
+        text_result(body)
+    } else {
+        error_result(body)
     }
+}
+
+async fn list_accounts(accounts: &Accounts) -> Result<Value> {
+    let entries = join_all(accounts.list.iter().map(|a| async move {
+        let mut e = Map::new();
+        e.insert("account".into(), json!(a.name));
+        e.insert(
+            "default".into(),
+            json!(accounts.default.as_deref() == Some(a.name.as_str())),
+        );
+        match &a.load_error {
+            Some(err) => {
+                e.insert("status".into(), json!("unavailable"));
+                e.insert("error".into(), json!(err));
+            }
+            None => {
+                match a.email().await {
+                    Ok(email) => {
+                        e.insert("email".into(), json!(email));
+                        e.insert("status".into(), json!("ok"));
+                    }
+                    Err(err) => {
+                        e.insert("status".into(), json!("error"));
+                        e.insert("error".into(), json!(format!("{err:#}")));
+                    }
+                }
+                e.insert("scopes".into(), json!(a.scopes));
+            }
+        }
+        Value::Object(e)
+    }))
+    .await;
+    Ok(text_result(serde_json::to_string_pretty(&json!({
+        "accounts": entries,
+        "defaultAccount": accounts.default,
+    }))?))
 }
 
 // ------------------------------------------------------------------ arg types
@@ -1223,7 +1285,7 @@ fn criteria_text(c: &Map<String, Value>) -> String {
 
 fn action_text(a: &Map<String, Value>) -> String {
     a.iter()
-        .filter(|(_, v)| !v.is_null() && v.as_array().map_or(true, |x| !x.is_empty()))
+        .filter(|(_, v)| !v.is_null() && v.as_array().is_none_or(|x| !x.is_empty()))
         .map(|(k, v)| format!("{k}: {}", display_value(v)))
         .collect::<Vec<_>>()
         .join(", ")
