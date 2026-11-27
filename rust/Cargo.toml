@@ -1,0 +1,37 @@
+[package]
+name = "gmail-mcp"
+version = "2.0.0"
+edition = "2021"
+description = "Lean Gmail MCP server in Rust: one process, many Gmail accounts"
+license = "MIT"
+repository = "https://github.com/natesena/Gmail-MCP-Server"
+rust-version = "1.80"
+
+[[bin]]
+name = "gmail-mcp"
+path = "src/main.rs"
+
+[lib]
+name = "gmail_mcp"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+futures = "0.3"
+mime_guess = "2"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "sync", "fs", "net", "time", "process"] }
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"
+wiremock = "0.6"
+
+[profile.release]
+lto = "thin"
+strip = true
