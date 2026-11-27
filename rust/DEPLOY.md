@@ -13,8 +13,21 @@ mkdir -p secrets && chmod 700 secrets
 docker run --rm gmail-mcp:local gmail-mcp store keygen > secrets/gmail_store_key
 chmod 600 secrets/gmail_store_key    # back this key up somewhere safe: without it the store is unreadable
 docker compose up -d
-docker compose logs tailscale        # if TS_AUTHKEY is empty, open the login link shown here once
 ```
+
+Joining the tailnet: either set `TS_AUTHKEY` in `.env`, or log in once with a
+link. Don't use the link printed by `docker compose logs tailscale`: the
+container's startup script gives up after about a minute and throws that link
+away. Instead:
+
+```bash
+docker run -d --name ts-login -v gmail-mcp_tailscale-state:/var/lib/tailscale tailscale/tailscale:v1.90.6 \
+  tailscaled --tun=userspace-networking --statedir=/var/lib/tailscale --socket=/tmp/ts.sock
+docker exec ts-login tailscale --socket=/tmp/ts.sock up --hostname=gmail --timeout=0   # open the link, approve
+docker rm -f ts-login && docker compose up -d
+```
+
+Then disable key expiry for the `gmail` machine in the Tailscale admin console.
 
 ## Accounts (run on the host)
 
