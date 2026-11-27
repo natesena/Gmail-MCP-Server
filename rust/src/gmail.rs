@@ -58,9 +58,9 @@ impl Gmail {
         body: Option<&Value>,
     ) -> Result<Value> {
         let url = format!("{}{}", self.base, path);
-        let mut force = false;
+        let mut rejected: Option<String> = None;
         loop {
-            let token = self.tokens.access_token(force).await?;
+            let token = self.tokens.access_token(rejected.as_deref()).await?;
             let mut req = self
                 .http
                 .request(method.clone(), &url)
@@ -72,8 +72,8 @@ impl Gmail {
             let resp = req.send().await?;
             let status = resp.status();
             // One forced refresh on 401, for tokens revoked or expired early.
-            if status.as_u16() == 401 && !force {
-                force = true;
+            if status.as_u16() == 401 && rejected.is_none() {
+                rejected = Some(token);
                 continue;
             }
             let text = resp.text().await?;

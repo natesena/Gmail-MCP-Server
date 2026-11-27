@@ -1,0 +1,44 @@
+# Gmail MCP on your tailnet: https://gmail.<tailnet>.ts.net/mcp
+#
+# One-time setup on the host: see DEPLOY.md.
+#
+# The gmail container shares the tailscale container's network namespace and
+# listens on 127.0.0.1 only: nothing is published on the host or the LAN, and
+# the only way in is `tailscale serve`, which sets (and strips spoofed copies
+# of) the Tailscale-User-Login header the server checks.
+name: gmail-mcp
+
+services:
+  tailscale:
+    image: tailscale/tailscale:v1.90.6
+    hostname: ${TS_HOSTNAME:-gmail}
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: ${TS_HOSTNAME:-gmail}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./tailscale/serve.json:/config/serve.json:ro
+    restart: unless-stopped
+
+  gmail:
+    build: .
+    image: gmail-mcp:local
+    network_mode: service:tailscale
+    depends_on: [tailscale]
+    environment:
+      GMAIL_MCP_ALLOWED_LOGINS: ${GMAIL_MCP_ALLOWED_LOGINS:?set GMAIL_MCP_ALLOWED_LOGINS in .env}
+    secrets: [gmail_store_key]
+    volumes:
+      - gmail-data:/data
+    restart: unless-stopped
+
+secrets:
+  gmail_store_key:
+    file: ./secrets/gmail_store_key
+
+volumes:
+  tailscale-state:
+  gmail-data:

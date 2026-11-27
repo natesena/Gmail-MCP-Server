@@ -8,6 +8,7 @@ use crate::scopes;
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
@@ -26,7 +27,7 @@ pub fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ClientKeys {
     pub client_id: String,
     pub client_secret: String,
@@ -173,10 +174,27 @@ struct TokenState {
     expiry_date: Option<i64>,
 }
 
-/// One account's tokens plus what it needs to refresh them.
+/// Where refreshed tokens are saved: a legacy credentials file, or the
+/// encrypted store.
+pub type PersistFn = Arc<dyn Fn(&Map<String, Value>) -> Result<()> + Send + Sync>;
+
+/// Persist by merging into a credentials JSON file (the Node server's format).
+pub fn file_persist(path: PathBuf) -> PersistFn {
+    Arc::new(move |tokens: &Map<String, Value>| {
+        let on_disk: Value = match std::fs::read_to_string(&path) {
+            Ok(t) => serde_json::from_str(&t).unwrap_or_else(|_| json!({})),
+            Err(_) => json!({}),
+        };
+        write_private(&path, &merge_refreshed(&on_disk, tokens))
+    })
+}
+
+/// One account's tokens plus what it needs to refresh them. All refreshes
+/// for the account go through one mutex, so concurrent callers share a
+/// single refresh.
 pub struct TokenStore {
     keys: ClientKeys,
-    credentials_path: PathBuf,
+    persist: PersistFn,
     token_url: String,
     http: reqwest::Client,
     state: Mutex<TokenState>,
@@ -185,26 +203,20 @@ pub struct TokenStore {
 impl TokenStore {
     pub fn new(
         keys: ClientKeys,
-        creds: &StoredCredentials,
-        credentials_path: PathBuf,
+        tokens: &Map<String, Value>,
+        persist: PersistFn,
         token_url: String,
         http: reqwest::Client,
     ) -> Self {
-        let s = |k: &str| {
-            creds
-                .tokens
-                .get(k)
-                .and_then(Value::as_str)
-                .map(String::from)
-        };
+        let s = |k: &str| tokens.get(k).and_then(Value::as_str).map(String::from);
         let state = TokenState {
             access_token: s("access_token"),
             refresh_token: s("refresh_token"),
-            expiry_date: creds.tokens.get("expiry_date").and_then(Value::as_i64),
+            expiry_date: tokens.get("expiry_date").and_then(Value::as_i64),
         };
         Self {
             keys,
-            credentials_path,
+            persist,
             token_url,
             http,
             state: Mutex::new(state),
@@ -212,19 +224,21 @@ impl TokenStore {
     }
 
     /// A valid access token, refreshing first if it is missing or about to
-    /// expire. `force` refreshes unconditionally (used after a 401).
-    pub async fn access_token(&self, force: bool) -> Result<String> {
+    /// expire. `rejected` is a token the API just refused (401): refresh only
+    /// if it is still the current one, so concurrent 401s cause one refresh.
+    pub async fn access_token(&self, rejected: Option<&str>) -> Result<String> {
         let mut st = self.state.lock().await;
         let fresh = match (&st.access_token, st.expiry_date) {
             (Some(_), Some(exp)) => exp - EXPIRY_MARGIN_MS > now_ms(),
             (Some(_), None) => true,
             (None, _) => false,
         };
-        if fresh && !force {
+        let was_rejected = rejected.is_some() && rejected == st.access_token.as_deref();
+        if fresh && !was_rejected {
             return Ok(st.access_token.clone().unwrap_or_default());
         }
         let refresh = st.refresh_token.clone().ok_or_else(|| {
-            anyhow!("No refresh token stored; re-run `gmail-mcp auth` for this account")
+            anyhow!("No refresh token stored; re-authorize this account (gmail-mcp accounts add)")
         })?;
         let resp = self
             .http
@@ -252,21 +266,10 @@ impl TokenStore {
             st.refresh_token = Some(r.to_string());
         }
         // Persist so the next process start doesn't re-read a stale token.
-        if let Err(e) = self.persist(&tokens) {
-            eprintln!(
-                "Failed to persist refreshed tokens to {}: {e:#}",
-                self.credentials_path.display()
-            );
+        if let Err(e) = (self.persist)(&tokens) {
+            eprintln!("Failed to persist refreshed tokens: {e:#}");
         }
         Ok(st.access_token.clone().unwrap_or_default())
-    }
-
-    fn persist(&self, tokens: &Map<String, Value>) -> Result<()> {
-        let on_disk: Value = match std::fs::read_to_string(&self.credentials_path) {
-            Ok(t) => serde_json::from_str(&t).unwrap_or_else(|_| json!({})),
-            Err(_) => json!({}),
-        };
-        write_private(&self.credentials_path, &merge_refreshed(&on_disk, tokens))
     }
 }
 
