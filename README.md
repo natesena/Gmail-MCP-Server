@@ -51,6 +51,18 @@ A Model Context Protocol (MCP) server for Gmail integration in Claude Desktop wi
 ![](https://badge.mcpx.dev?type=server 'MCP Server')
 
 
+## Rust version: one server, many accounts
+
+`rust/` contains a Rust port of this server. A single process can serve several Gmail accounts, for example personal and work, so you no longer register the server once per account. It keeps the same tools, schemas and output text. In multi-account mode, every tool takes an `account` argument, and a `list_accounts` tool lists the configured accounts. It reuses existing `~/.gmail-*/` credential directories as they are:
+
+```bash
+cd rust && cargo build --release
+claude mcp add gmail -s user -- $PWD/target/release/gmail-mcp \
+  --account personal=$HOME/.gmail-personal --account work=$HOME/.gmail-work
+```
+
+See [rust/README.md](rust/README.md) for the accounts file, per-account scopes and `auth`.
+
 ## Features
 
 - Send emails with subject, content, **attachments**, and recipients

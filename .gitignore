@@ -34,3 +34,6 @@ credentials.json
 .gcp-oauth.keys.json
 # Local scratch (browser-agent screenshots etc.)
 tmp/
+
+# Rust build output
+rust/target/

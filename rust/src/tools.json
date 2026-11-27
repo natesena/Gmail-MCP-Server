@@ -1,0 +1,1437 @@
+[
+  {
+    "name": "read_email",
+    "description": "Retrieves the content of a specific email",
+    "scopes": [
+      "gmail.readonly",
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Read Email",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "ID of the email message to retrieve"
+        }
+      },
+      "required": [
+        "messageId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "search_emails",
+    "description": "Searches for emails using Gmail search syntax",
+    "scopes": [
+      "gmail.readonly",
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Search Emails",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Gmail search query (e.g., 'from:example@gmail.com')"
+        },
+        "maxResults": {
+          "type": "number",
+          "description": "Maximum number of results to return"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "download_attachment",
+    "description": "Downloads an email attachment to a specified location",
+    "scopes": [
+      "gmail.readonly",
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Download Attachment",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "ID of the email message containing the attachment"
+        },
+        "attachmentId": {
+          "type": "string",
+          "description": "ID of the attachment to download"
+        },
+        "filename": {
+          "type": "string",
+          "description": "Filename to save the attachment as (if not provided, uses original filename)"
+        },
+        "savePath": {
+          "type": "string",
+          "description": "Directory path to save the attachment (defaults to current directory)"
+        }
+      },
+      "required": [
+        "messageId",
+        "attachmentId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_thread",
+    "description": "Retrieves all messages in an email thread in one call. Returns messages ordered chronologically (oldest first) with full content, headers, labels, and attachment metadata.",
+    "scopes": [
+      "gmail.readonly",
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Get Thread",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "threadId": {
+          "type": "string",
+          "description": "ID of the email thread to retrieve"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "full",
+            "metadata",
+            "minimal"
+          ],
+          "default": "full",
+          "description": "Format of the email messages returned (default: full)"
+        }
+      },
+      "required": [
+        "threadId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "list_inbox_threads",
+    "description": "Lists email threads matching a query (default: inbox). Returns thread-level view with snippet, message count, and latest message metadata.",
+    "scopes": [
+      "gmail.readonly",
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "List Inbox Threads",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "default": "in:inbox",
+          "description": "Gmail search query (default: 'in:inbox')"
+        },
+        "maxResults": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum number of threads to return (default: 50)"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_inbox_with_threads",
+    "description": "Convenience tool that lists threads and optionally expands each with full message content. One call returns the full inbox with complete thread bodies.",
+    "scopes": [
+      "gmail.readonly",
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Get Inbox with Threads",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "default": "in:inbox",
+          "description": "Gmail search query (default: 'in:inbox')"
+        },
+        "maxResults": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum number of threads to return (default: 50)"
+        },
+        "expandThreads": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to fetch full thread content for each thread (default: true)"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "modify_thread",
+    "description": "Modifies labels on ALL messages in a thread atomically using the Gmail threads.modify endpoint. Use this instead of modify_email when you want to apply label changes (e.g., archive, mark as read) to an entire thread at once.",
+    "scopes": [
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Modify Thread",
+      "destructiveHint": true,
+      "idempotentHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "threadId": {
+          "type": "string",
+          "description": "ID of the Gmail thread to modify"
+        },
+        "addLabelIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of label IDs to add to all messages in the thread"
+        },
+        "removeLabelIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of label IDs to remove from all messages in the thread"
+        }
+      },
+      "required": [
+        "threadId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "download_email",
+    "description": "Downloads an email to a file in various formats (json, eml, txt, html). Returns metadata only - useful for saving emails without consuming context.",
+    "scopes": [
+      "gmail.readonly",
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Download Email",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "ID of the email message to download"
+        },
+        "savePath": {
+          "type": "string",
+          "description": "Directory path to save the email file"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "eml",
+            "txt",
+            "html"
+          ],
+          "default": "json",
+          "description": "Output format: json (structured data), eml (raw RFC822), txt (plain text), html (formatted HTML)"
+        }
+      },
+      "required": [
+        "messageId",
+        "savePath"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "send_email",
+    "description": "Sends a new email. Supports plain text, HTML, file attachments, and images embedded inline in the HTML body via inlineImages.",
+    "scopes": [
+      "gmail.modify",
+      "gmail.compose",
+      "gmail.send"
+    ],
+    "annotations": {
+      "title": "Send Email",
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of recipient email addresses"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Email subject"
+        },
+        "body": {
+          "type": "string",
+          "description": "Email body content (used for text/plain or when htmlBody not provided)"
+        },
+        "from": {
+          "type": "string",
+          "description": "Sender email address (must be a configured send-as alias in Gmail settings). Defaults to account's default send-as address if not specified."
+        },
+        "htmlBody": {
+          "type": "string",
+          "description": "HTML version of the email body"
+        },
+        "mimeType": {
+          "type": "string",
+          "enum": [
+            "text/plain",
+            "text/html",
+            "multipart/alternative"
+          ],
+          "default": "text/plain",
+          "description": "Email content type"
+        },
+        "cc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of CC recipients"
+        },
+        "bcc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of BCC recipients"
+        },
+        "threadId": {
+          "type": "string",
+          "description": "Thread ID to reply to"
+        },
+        "inReplyTo": {
+          "type": "string",
+          "description": "Message ID being replied to"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of file paths to attach to the email"
+        },
+        "inlineImages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cid": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^\\s<>]+$",
+                "description": "Content-ID for the image, referenced from htmlBody as <img src=\"cid:CID\">"
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute file path to the image (use this OR content)"
+              },
+              "content": {
+                "type": "string",
+                "description": "Base64-encoded image data (use this OR path)"
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "image/png",
+                  "image/jpeg",
+                  "image/gif",
+                  "image/webp",
+                  "image/bmp",
+                  "image/x-icon"
+                ],
+                "description": "Image MIME type \u2014 required when using `content`. SVG is intentionally unsupported."
+              },
+              "filename": {
+                "type": "string",
+                "description": "Display filename for the image part (defaults derived from path or cid)"
+              }
+            },
+            "required": [
+              "cid"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Images embedded inline in the HTML body, each referenced from htmlBody as <img src=\"cid:CID\">. Requires htmlBody to be set."
+        }
+      },
+      "required": [
+        "to",
+        "subject",
+        "body"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "draft_email",
+    "description": "Draft a new email. Supports plain text, HTML, file attachments, and images embedded inline in the HTML body via inlineImages.",
+    "scopes": [
+      "gmail.modify",
+      "gmail.compose"
+    ],
+    "annotations": {
+      "title": "Draft Email",
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of recipient email addresses"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Email subject"
+        },
+        "body": {
+          "type": "string",
+          "description": "Email body content (used for text/plain or when htmlBody not provided)"
+        },
+        "from": {
+          "type": "string",
+          "description": "Sender email address (must be a configured send-as alias in Gmail settings). Defaults to account's default send-as address if not specified."
+        },
+        "htmlBody": {
+          "type": "string",
+          "description": "HTML version of the email body"
+        },
+        "mimeType": {
+          "type": "string",
+          "enum": [
+            "text/plain",
+            "text/html",
+            "multipart/alternative"
+          ],
+          "default": "text/plain",
+          "description": "Email content type"
+        },
+        "cc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of CC recipients"
+        },
+        "bcc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of BCC recipients"
+        },
+        "threadId": {
+          "type": "string",
+          "description": "Thread ID to reply to"
+        },
+        "inReplyTo": {
+          "type": "string",
+          "description": "Message ID being replied to"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of file paths to attach to the email"
+        },
+        "inlineImages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cid": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^\\s<>]+$",
+                "description": "Content-ID for the image, referenced from htmlBody as <img src=\"cid:CID\">"
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute file path to the image (use this OR content)"
+              },
+              "content": {
+                "type": "string",
+                "description": "Base64-encoded image data (use this OR path)"
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "image/png",
+                  "image/jpeg",
+                  "image/gif",
+                  "image/webp",
+                  "image/bmp",
+                  "image/x-icon"
+                ],
+                "description": "Image MIME type \u2014 required when using `content`. SVG is intentionally unsupported."
+              },
+              "filename": {
+                "type": "string",
+                "description": "Display filename for the image part (defaults derived from path or cid)"
+              }
+            },
+            "required": [
+              "cid"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Images embedded inline in the HTML body, each referenced from htmlBody as <img src=\"cid:CID\">. Requires htmlBody to be set."
+        }
+      },
+      "required": [
+        "to",
+        "subject",
+        "body"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "send_draft",
+    "description": "Sends an existing draft (created via draft_email) and atomically removes it from Drafts. Prefer this over send_email when you've previously created a draft for review \u2014 avoids leaving an orphan draft in the user's Drafts folder.",
+    "scopes": [
+      "gmail.modify",
+      "gmail.compose",
+      "gmail.send"
+    ],
+    "annotations": {
+      "title": "Send Draft",
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "draftId": {
+          "type": "string",
+          "description": "ID of the draft to send (returned by draft_email)"
+        }
+      },
+      "required": [
+        "draftId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "delete_draft",
+    "description": "Deletes a draft. Use to discard an abandoned or superseded draft.",
+    "scopes": [
+      "gmail.modify",
+      "gmail.compose"
+    ],
+    "annotations": {
+      "title": "Delete Draft",
+      "destructiveHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "draftId": {
+          "type": "string",
+          "description": "ID of the draft to delete"
+        }
+      },
+      "required": [
+        "draftId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "update_draft",
+    "description": "Replaces the content of an existing draft. Use during iteration (\"change this and that\") instead of creating a new draft each time \u2014 avoids accumulating draft copies in the user's Drafts folder.",
+    "scopes": [
+      "gmail.modify",
+      "gmail.compose"
+    ],
+    "annotations": {
+      "title": "Update Draft",
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "draftId": {
+          "type": "string",
+          "description": "ID of the draft to update"
+        },
+        "to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of recipient email addresses"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Email subject"
+        },
+        "body": {
+          "type": "string",
+          "description": "Email body content (used for text/plain or when htmlBody not provided)"
+        },
+        "from": {
+          "type": "string",
+          "description": "Sender email address (must be a configured send-as alias in Gmail settings). Defaults to account's default send-as address if not specified."
+        },
+        "htmlBody": {
+          "type": "string",
+          "description": "HTML version of the email body"
+        },
+        "mimeType": {
+          "type": "string",
+          "enum": [
+            "text/plain",
+            "text/html",
+            "multipart/alternative"
+          ],
+          "default": "text/plain",
+          "description": "Email content type"
+        },
+        "cc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of CC recipients"
+        },
+        "bcc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of BCC recipients"
+        },
+        "threadId": {
+          "type": "string",
+          "description": "Thread ID to reply to"
+        },
+        "inReplyTo": {
+          "type": "string",
+          "description": "Message ID being replied to"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of file paths to attach to the email"
+        },
+        "inlineImages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cid": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^\\s<>]+$",
+                "description": "Content-ID for the image, referenced from htmlBody as <img src=\"cid:CID\">"
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute file path to the image (use this OR content)"
+              },
+              "content": {
+                "type": "string",
+                "description": "Base64-encoded image data (use this OR path)"
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "image/png",
+                  "image/jpeg",
+                  "image/gif",
+                  "image/webp",
+                  "image/bmp",
+                  "image/x-icon"
+                ],
+                "description": "Image MIME type \u2014 required when using `content`. SVG is intentionally unsupported."
+              },
+              "filename": {
+                "type": "string",
+                "description": "Display filename for the image part (defaults derived from path or cid)"
+              }
+            },
+            "required": [
+              "cid"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Images embedded inline in the HTML body, each referenced from htmlBody as <img src=\"cid:CID\">. Requires htmlBody to be set."
+        }
+      },
+      "required": [
+        "draftId",
+        "to",
+        "subject",
+        "body"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "modify_email",
+    "description": "Modifies email labels (move to different folders)",
+    "scopes": [
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Modify Email",
+      "destructiveHint": true,
+      "idempotentHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "ID of the email message to modify"
+        },
+        "labelIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of label IDs to apply"
+        },
+        "addLabelIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of label IDs to add to the message"
+        },
+        "removeLabelIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of label IDs to remove from the message"
+        }
+      },
+      "required": [
+        "messageId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "delete_email",
+    "description": "Permanently deletes an email. Requires gmail.full because Gmail's delete endpoint is not covered by gmail.modify.",
+    "scopes": [
+      "gmail.full"
+    ],
+    "annotations": {
+      "title": "Delete Email",
+      "destructiveHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "ID of the email message to delete"
+        }
+      },
+      "required": [
+        "messageId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "batch_modify_emails",
+    "description": "Modifies labels for multiple emails in batches",
+    "scopes": [
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Batch Modify Emails",
+      "destructiveHint": true,
+      "idempotentHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of message IDs to modify"
+        },
+        "addLabelIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of label IDs to add to all messages"
+        },
+        "removeLabelIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of label IDs to remove from all messages"
+        },
+        "batchSize": {
+          "type": "number",
+          "default": 50,
+          "description": "Number of messages to process in each batch (default: 50)"
+        }
+      },
+      "required": [
+        "messageIds"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "report_phishing",
+    "description": "Reports a message as phishing using the closest public Gmail API behavior by applying the SPAM label",
+    "scopes": [
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Report Phishing",
+      "destructiveHint": true,
+      "idempotentHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "ID of the email message to report as phishing"
+        }
+      },
+      "required": [
+        "messageId"
+      ],
+      "additionalProperties": false,
+      "description": "Reports a message as phishing using the closest public Gmail API behavior by applying the SPAM label"
+    }
+  },
+  {
+    "name": "batch_report_phishing",
+    "description": "Reports multiple messages as phishing using the closest public Gmail API behavior by applying the SPAM label",
+    "scopes": [
+      "gmail.modify"
+    ],
+    "annotations": {
+      "title": "Batch Report Phishing",
+      "destructiveHint": true,
+      "idempotentHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of message IDs to report as phishing"
+        },
+        "batchSize": {
+          "type": "number",
+          "default": 50,
+          "description": "Number of messages to process in each batch (default: 50)"
+        }
+      },
+      "required": [
+        "messageIds"
+      ],
+      "additionalProperties": false,
+      "description": "Reports multiple messages as phishing using the closest public Gmail API behavior by applying the SPAM label"
+    }
+  },
+  {
+    "name": "batch_delete_emails",
+    "description": "Permanently deletes multiple emails in batches. Requires gmail.full because Gmail's batchDelete endpoint is not covered by gmail.modify.",
+    "scopes": [
+      "gmail.full"
+    ],
+    "annotations": {
+      "title": "Batch Delete Emails",
+      "destructiveHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of message IDs to delete"
+        },
+        "batchSize": {
+          "type": "number",
+          "default": 50,
+          "description": "Number of messages to process in each batch (default: 50)"
+        }
+      },
+      "required": [
+        "messageIds"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "list_email_labels",
+    "description": "Retrieves all available Gmail labels",
+    "scopes": [
+      "gmail.readonly",
+      "gmail.modify",
+      "gmail.labels"
+    ],
+    "annotations": {
+      "title": "List Email Labels",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false,
+      "description": "Retrieves all available Gmail labels"
+    }
+  },
+  {
+    "name": "create_label",
+    "description": "Creates a new Gmail label",
+    "scopes": [
+      "gmail.modify",
+      "gmail.labels"
+    ],
+    "annotations": {
+      "title": "Create Label",
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name for the new label"
+        },
+        "messageListVisibility": {
+          "type": "string",
+          "enum": [
+            "show",
+            "hide"
+          ],
+          "description": "Whether to show or hide the label in the message list"
+        },
+        "labelListVisibility": {
+          "type": "string",
+          "enum": [
+            "labelShow",
+            "labelShowIfUnread",
+            "labelHide"
+          ],
+          "description": "Visibility of the label in the label list"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "description": "Creates a new Gmail label"
+    }
+  },
+  {
+    "name": "update_label",
+    "description": "Updates an existing Gmail label",
+    "scopes": [
+      "gmail.modify",
+      "gmail.labels"
+    ],
+    "annotations": {
+      "title": "Update Label",
+      "destructiveHint": true,
+      "idempotentHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID of the label to update"
+        },
+        "name": {
+          "type": "string",
+          "description": "New name for the label"
+        },
+        "messageListVisibility": {
+          "type": "string",
+          "enum": [
+            "show",
+            "hide"
+          ],
+          "description": "Whether to show or hide the label in the message list"
+        },
+        "labelListVisibility": {
+          "type": "string",
+          "enum": [
+            "labelShow",
+            "labelShowIfUnread",
+            "labelHide"
+          ],
+          "description": "Visibility of the label in the label list"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "description": "Updates an existing Gmail label"
+    }
+  },
+  {
+    "name": "delete_label",
+    "description": "Deletes a Gmail label",
+    "scopes": [
+      "gmail.modify",
+      "gmail.labels"
+    ],
+    "annotations": {
+      "title": "Delete Label",
+      "destructiveHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID of the label to delete"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "description": "Deletes a Gmail label"
+    }
+  },
+  {
+    "name": "get_or_create_label",
+    "description": "Gets an existing label by name or creates it if it doesn't exist",
+    "scopes": [
+      "gmail.modify",
+      "gmail.labels"
+    ],
+    "annotations": {
+      "title": "Get or Create Label",
+      "destructiveHint": false,
+      "idempotentHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the label to get or create"
+        },
+        "messageListVisibility": {
+          "type": "string",
+          "enum": [
+            "show",
+            "hide"
+          ],
+          "description": "Whether to show or hide the label in the message list"
+        },
+        "labelListVisibility": {
+          "type": "string",
+          "enum": [
+            "labelShow",
+            "labelShowIfUnread",
+            "labelHide"
+          ],
+          "description": "Visibility of the label in the label list"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "description": "Gets an existing label by name or creates it if it doesn't exist"
+    }
+  },
+  {
+    "name": "list_filters",
+    "description": "Retrieves all Gmail filters",
+    "scopes": [
+      "gmail.settings.basic"
+    ],
+    "annotations": {
+      "title": "List Filters",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false,
+      "description": "Retrieves all Gmail filters"
+    }
+  },
+  {
+    "name": "get_filter",
+    "description": "Gets details of a specific Gmail filter",
+    "scopes": [
+      "gmail.settings.basic"
+    ],
+    "annotations": {
+      "title": "Get Filter",
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filterId": {
+          "type": "string",
+          "description": "ID of the filter to retrieve"
+        }
+      },
+      "required": [
+        "filterId"
+      ],
+      "additionalProperties": false,
+      "description": "Gets details of a specific Gmail filter"
+    }
+  },
+  {
+    "name": "create_filter",
+    "description": "Creates a new Gmail filter with custom criteria and actions",
+    "scopes": [
+      "gmail.settings.basic"
+    ],
+    "annotations": {
+      "title": "Create Filter",
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "criteria": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "description": "Sender email address to match"
+            },
+            "to": {
+              "type": "string",
+              "description": "Recipient email address to match"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Subject text to match"
+            },
+            "query": {
+              "type": "string",
+              "description": "Gmail search query (e.g., 'has:attachment')"
+            },
+            "negatedQuery": {
+              "type": "string",
+              "description": "Text that must NOT be present"
+            },
+            "hasAttachment": {
+              "type": "boolean",
+              "description": "Whether to match emails with attachments"
+            },
+            "excludeChats": {
+              "type": "boolean",
+              "description": "Whether to exclude chat messages"
+            },
+            "size": {
+              "type": "number",
+              "description": "Email size in bytes"
+            },
+            "sizeComparison": {
+              "type": "string",
+              "enum": [
+                "unspecified",
+                "smaller",
+                "larger"
+              ],
+              "description": "Size comparison operator"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Criteria for matching emails"
+        },
+        "action": {
+          "type": "object",
+          "properties": {
+            "addLabelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Label IDs to add to matching emails"
+            },
+            "removeLabelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Label IDs to remove from matching emails"
+            },
+            "forward": {
+              "type": "string",
+              "description": "Email address to forward matching emails to"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Actions to perform on matching emails"
+        }
+      },
+      "required": [
+        "criteria",
+        "action"
+      ],
+      "additionalProperties": false,
+      "description": "Creates a new Gmail filter"
+    }
+  },
+  {
+    "name": "delete_filter",
+    "description": "Deletes a Gmail filter",
+    "scopes": [
+      "gmail.settings.basic"
+    ],
+    "annotations": {
+      "title": "Delete Filter",
+      "destructiveHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filterId": {
+          "type": "string",
+          "description": "ID of the filter to delete"
+        }
+      },
+      "required": [
+        "filterId"
+      ],
+      "additionalProperties": false,
+      "description": "Deletes a Gmail filter"
+    }
+  },
+  {
+    "name": "create_filter_from_template",
+    "description": "Creates a filter using a pre-defined template for common scenarios",
+    "scopes": [
+      "gmail.settings.basic"
+    ],
+    "annotations": {
+      "title": "Create Filter from Template",
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "template": {
+          "type": "string",
+          "enum": [
+            "fromSender",
+            "withSubject",
+            "withAttachments",
+            "largeEmails",
+            "containingText",
+            "mailingList"
+          ],
+          "description": "Pre-defined filter template to use"
+        },
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "senderEmail": {
+              "type": "string",
+              "description": "Sender email (for fromSender template)"
+            },
+            "subjectText": {
+              "type": "string",
+              "description": "Subject text (for withSubject template)"
+            },
+            "searchText": {
+              "type": "string",
+              "description": "Text to search for (for containingText template)"
+            },
+            "listIdentifier": {
+              "type": "string",
+              "description": "Mailing list identifier (for mailingList template)"
+            },
+            "sizeInBytes": {
+              "type": "number",
+              "description": "Size threshold in bytes (for largeEmails template)"
+            },
+            "labelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Label IDs to apply"
+            },
+            "archive": {
+              "type": "boolean",
+              "description": "Whether to archive (skip inbox)"
+            },
+            "markAsRead": {
+              "type": "boolean",
+              "description": "Whether to mark as read"
+            },
+            "markImportant": {
+              "type": "boolean",
+              "description": "Whether to mark as important"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Template-specific parameters"
+        }
+      },
+      "required": [
+        "template",
+        "parameters"
+      ],
+      "additionalProperties": false,
+      "description": "Creates a filter using a pre-defined template"
+    }
+  },
+  {
+    "name": "reply_all",
+    "description": "Replies to all recipients of an email. Automatically fetches the original email to build the recipient list (To, CC) and sets proper threading headers.",
+    "scopes": [
+      "gmail.modify",
+      "gmail.compose",
+      "gmail.send"
+    ],
+    "annotations": {
+      "title": "Reply All",
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "ID of the email message to reply to"
+        },
+        "body": {
+          "type": "string",
+          "description": "Reply body content (used for text/plain or when htmlBody not provided)"
+        },
+        "htmlBody": {
+          "type": "string",
+          "description": "HTML version of the reply body"
+        },
+        "mimeType": {
+          "type": "string",
+          "enum": [
+            "text/plain",
+            "text/html",
+            "multipart/alternative"
+          ],
+          "default": "text/plain",
+          "description": "Email content type"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of file paths to attach to the reply"
+        },
+        "inlineImages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cid": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^\\s<>]+$",
+                "description": "Content-ID for the image, referenced from htmlBody as <img src=\"cid:CID\">"
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute file path to the image (use this OR content)"
+              },
+              "content": {
+                "type": "string",
+                "description": "Base64-encoded image data (use this OR path)"
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "image/png",
+                  "image/jpeg",
+                  "image/gif",
+                  "image/webp",
+                  "image/bmp",
+                  "image/x-icon"
+                ],
+                "description": "Image MIME type \u2014 required when using `content`. SVG is intentionally unsupported."
+              },
+              "filename": {
+                "type": "string",
+                "description": "Display filename for the image part (defaults derived from path or cid)"
+              }
+            },
+            "required": [
+              "cid"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Images embedded inline in the HTML body, each referenced from htmlBody as <img src=\"cid:CID\">. Requires htmlBody to be set."
+        }
+      },
+      "required": [
+        "messageId",
+        "body"
+      ],
+      "additionalProperties": false
+    }
+  }
+]
